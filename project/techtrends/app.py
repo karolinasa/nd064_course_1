@@ -10,6 +10,7 @@ import logging
 def get_db_connection():
     connection = sqlite3.connect('database.db')
     connection.row_factory = sqlite3.Row
+    app.config['DB_CONNECTION_COUNTER'] += 1
     return connection
 
 
@@ -24,7 +25,8 @@ def get_post(post_id):
 logger = logging.getLogger(__name__)
 # Define the Flask application
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'your secret key'
+app.config['SECRET_KEY'] = 'SECRET'
+app.config['DB_CONNECTION_COUNTER'] = 0
 
 
 # Define the main route of the web application
@@ -52,7 +54,6 @@ def post(post_id):
 # Define the About Us page
 @app.route('/about')
 def about():
-    extra_data = {'endpoint': '/about'}
     logger.info('About Us page retrieved.')
     return render_template('about.html')
 
@@ -69,7 +70,7 @@ def create():
         else:
             connection = get_db_connection()
             connection.execute('INSERT INTO posts (title, content) VALUES (?, ?)',
-                         (title, content))
+                               (title, content))
             connection.commit()
             connection.close()
 
@@ -95,12 +96,12 @@ def healthz():
 @app.route('/metrics')
 def metrics():
     connection = get_db_connection()
-    post_count = connection.execute('SELECT COUNT(*) FROM posts').fetchall()
+    post_count = connection.execute('SELECT COUNT(*) FROM posts').fetchone()[0]
     connection.close()
 
-    data = {'data': {'db_connection_count': 1, 'post_count': post_count}}
+    data = {'db_connection_count': app.config['DB_CONNECTION_COUNTER'], 'post_count': post_count}
     response = app.response_class(
-            response=json.dumps(),
+            response=json.dumps(data),
             status=200,
             mimetype='application/json'
     )
